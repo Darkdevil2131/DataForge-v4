@@ -1,61 +1,49 @@
-import axios from 'axios'
+import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_API_URL || ''
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 const api = axios.create({
-  baseURL: BASE_URL,
-  timeout: 120_000,
-})
+  baseURL: API_BASE_URL,
 
-export const analyzeDataset = async (file, prompt) => {
-  const form = new FormData()
-  form.append('file', file)
-  form.append('prompt', prompt)
-  const { data } = await api.post('/api/analyze', form)
-  return data
-}
+  // 10 MINUTES
+  timeout: 600000,
 
-export const processDataset = async (file, prompt, options = {}) => {
-  const form = new FormData()
-  form.append('file', file)
-  form.append('prompt', prompt)
-  form.append('run_anomaly_detection', options.anomaly ?? true)
-  form.append('run_feature_engineering', options.features ?? true)
-  const { data } = await api.post('/api/process', form)
-  return data
-}
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
-export const recommendDatasets = async (prompt) => {
-  const form = new FormData()
-  form.append('prompt', prompt)
-  const { data } = await api.post('/api/recommend', form)
-  return data
-}
+// Request logger
+api.interceptors.request.use(
+  (config) => {
+    console.log(
+      `[API REQUEST] ${config.method?.toUpperCase()} ${config.url}`
+    );
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-export const getDownloadUrl = (file, prompt, format = 'csv') => {
-  // Returns a function that triggers download
-  return async () => {
-    const form = new FormData()
-    form.append('file', file)
-    form.append('prompt', prompt)
-    form.append('format', format)
-    const response = await api.post('/api/download/cleaned', form, {
-      responseType: 'blob',
-    })
-    const url = URL.createObjectURL(response.data)
-    const a = document.createElement('a')
-    a.href = url
-    const ext = format === 'excel' ? 'xlsx' : format === 'parquet' ? 'parquet' : 'csv'
-    a.download = `cleaned_dataset.${ext}`
-    a.click()
-    URL.revokeObjectURL(url)
+// Response logger
+api.interceptors.response.use(
+  (response) => {
+    console.log(
+      `[API RESPONSE] ${response.status} ${response.config.url}`
+    );
+    return response;
+  },
+  (error) => {
+    console.error("[API ERROR]", error);
+
+    // Better timeout error
+    if (error.code === "ECONNABORTED") {
+      error.message =
+        "Processing took too long. The dataset pipeline exceeded timeout.";
+    }
+
+    return Promise.reject(error);
   }
-}
+);
 
-export const searchDatasets = async (prompt, intent = 'general_ml') => {
-  const form = new FormData()
-  form.append('prompt', prompt)
-  form.append('intent', intent)
-  const { data } = await api.post('/api/search-datasets', form)
-  return data
-}
+export default api;
