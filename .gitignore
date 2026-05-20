@@ -36,7 +36,6 @@ Thumbs.db
 
 # ML artifacts (large files)
 ml/saved_models/*.pkl
-backend/models/*.pkl
 # Keep training report
 !ml/saved_models/training_report.json
 
